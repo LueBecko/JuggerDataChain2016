@@ -1,0 +1,18 @@
+---
+title: "Ketten-Questionnaire"
+author: "Christian "Becko" Beck"
+date: "21 Oktober 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import
+
+Data had to be imported. The original xlsx was improved: two items (Person2 - Pompfe; 103 - best number of stones) were seperated into item groups, since multiple selections were effectively possible and encuraged by the questions. The file was exported into a csv for import into R (note: i know of the package 'xlsx', but it often does not what i want to do, while the other way through a csv has been profen to be rock solid)
+
+```{r import}
+Testergebnis.Fragebogen <- read.delim2("~/ownCloud/Programming/jugger_data/chain2016/Testergebnis Fragebogen.csv", quote="'")
+```
