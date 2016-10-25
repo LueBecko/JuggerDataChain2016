@@ -1,6 +1,6 @@
 ---
 title: "Ketten-Questionnaire"
-author: "Christian "Becko" Beck"
+author: "Christian 'Becko' Beck"
 date: "21 Oktober 2016"
 output: html_document
 ---
@@ -14,5 +14,167 @@ knitr::opts_chunk$set(echo = TRUE)
 Data had to be imported. The original xlsx was improved: two items (Person2 - Pompfe; 103 - best number of stones) were seperated into item groups, since multiple selections were effectively possible and encuraged by the questions. The file was exported into a csv for import into R (note: i know of the package 'xlsx', but it often does not what i want to do, while the other way through a csv has been profen to be rock solid)
 
 ```{r import}
-Testergebnis.Fragebogen <- read.delim2("~/ownCloud/Programming/jugger_data/chain2016/Testergebnis Fragebogen.csv", quote="'")
+Testergebnis.Fragebogen <- read.csv2("~/ownCloud/Programming/jugger_data/chain2016/Testergebnis Fragebogen.csv", row.names=1, quote="'", stringsAsFactors=FALSE)
+
+summary(Testergebnis.Fragebogen)
 ```
+
+## Cleaning
+
+```{r clean}
+library(magrittr)
+library(dplyr)
+
+Testergebnis.Fragebogen %<>% select(-Person.2, -X103)
+Testergebnis.Fragebogen$P2.Stab[is.na(Testergebnis.Fragebogen$P2.Stab)] <- 0
+Testergebnis.Fragebogen$P2.LP[is.na(Testergebnis.Fragebogen$P2.LP)] <- 0
+Testergebnis.Fragebogen$P2.Schild[is.na(Testergebnis.Fragebogen$P2.Schild)] <- 0
+Testergebnis.Fragebogen$P2.Q[is.na(Testergebnis.Fragebogen$P2.Q)] <- 0
+Testergebnis.Fragebogen$P2.Kette[is.na(Testergebnis.Fragebogen$P2.Kette)] <- 0
+Testergebnis.Fragebogen$P2.Quick[is.na(Testergebnis.Fragebogen$P2.Quick)] <- 0
+
+Testergebnis.Fragebogen$X103.5[is.na(Testergebnis.Fragebogen$X103.5)] <- 0
+Testergebnis.Fragebogen$X103.6[is.na(Testergebnis.Fragebogen$X103.6)] <- 0
+Testergebnis.Fragebogen$X103.7[is.na(Testergebnis.Fragebogen$X103.7)] <- 0
+Testergebnis.Fragebogen$X103.8[is.na(Testergebnis.Fragebogen$X103.8)] <- 0
+
+Testergebnis.Fragebogen %<>% mutate(P2.Stab = as.factor(P2.Stab), P2.LP = as.factor(P2.LP), P2.Schild = as.factor(P2.Schild), P2.Q = as.factor(P2.Q), P2.Quick = as.factor(P2.Quick), P2.Kette = as.factor(P2.Kette))
+
+```
+
+Note: There are a lot of questions that are asked wrong - the meaning of some of the answers is in many cases not clear. This is due to relative statements with no given baseline in the questions. Given the context and that the hypothesis to each statement is known (or guessable) beforehand makes it still possible - but quit dirty - to analyse all questions, however i reckon of giving these results to much credibility.
+
+## Basic Visualisation and exploration
+
+Note: Question Person.2 (which is your MAIN Pompfe) is somewhat ill posed. However important in the current contet is just the number of chain players, all others can be treated the same.
+
+```{r vis1}
+library(ggplot2)
+library(reshape2)
+
+cat(paste("Count of questionnaires: ", nrow(Testergebnis.Fragebogen)))
+cat(paste("Count of chains: ", sum(Testergebnis.Fragebogen$P2.Kette == 1)))
+cat(paste("Ratio of chains: ", mean(Testergebnis.Fragebogen$P2.Kette == 1)))
+
+# boxplot for each score
+ggplot(melt(Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52))) +
+  geom_boxplot(aes(x = variable, y = value)) +
+  theme_classic() + theme(axis.text.x = element_text(angle = 90)) +
+  scale_y_continuous(name = "Antworten", breaks = 1:5, minor_breaks = NULL, labels = c("Trifft nicht zu","Trifft eher nicht zu","unentscheiden","Trifft eher zu", "Trifft voll zu")) +
+  scale_x_discrete(name = "Fragen")
+
+# Aggregate of all scores
+Testergebnis.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52) %>% melt() %>% group_by(variable) %>% summarise(avg = mean(value, na.rm = TRUE), var = var(value, na.rm = TRUE))
+ggplot(Testergebnis.stats) +
+  geom_bar(aes(x = variable, y = avg),stat = "identity") +
+  geom_errorbar(aes(x = variable, ymin = avg, ymax = avg+var)) +
+  coord_cartesian(ylim = c(1,6)) +
+  theme_classic() + theme(axis.text.x = element_text(angle = 90)) +
+  scale_y_continuous(name = "Antworten", breaks = 1:5, minor_breaks = NULL, labels = c("Trifft nicht zu","Trifft eher nicht zu","unentscheiden","Trifft eher zu", "Trifft voll zu")) +
+  scale_x_discrete(name = "Fragen")
+
+# Aggregate of all scores nach Kette/nicht-Kette
+Testergebnis.stats2 <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52) %>% melt(id.vars = "P2.Kette") %>% group_by(P2.Kette, variable) %>% summarise(avg = mean(value, na.rm = TRUE), var = var(value, na.rm = TRUE))
+ggplot(Testergebnis.stats2) +
+  geom_bar(aes(x = variable, y = avg, fill = P2.Kette),stat = "identity", position = "dodge") +
+  geom_errorbar(aes(x = variable, ymin = avg, ymax = avg+var, fill = P2.Kette), position = "dodge", width = 0.9) +
+  coord_cartesian(ylim = c(1,6)) +
+  theme_classic() + theme(axis.text.x = element_text(angle = 90)) +
+  scale_y_continuous(name = "Antworten", breaks = 1:5, minor_breaks = NULL, labels = c("Trifft nicht zu","Trifft eher nicht zu","unentscheiden","Trifft eher zu", "Trifft voll zu")) +
+  scale_x_discrete(name = "Fragen") +
+#  scale_fill_discrete(name = "Kette") +
+  scale_fill_grey(name = "Kette?")
+
+```
+
+## First statistics
+
+```{r stats1}
+
+chain.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52)
+
+##### normality
+npv <- c()
+for (ci in 1:ncol(chain.stats)) {
+  npv[colnames(chain.stats)[ci]] <- shapiro.test(x = chain.stats[,ci])$p.value
+}
+
+npv < 0.05
+
+###### H0 test
+pv <- c()
+for (ci in 1:ncol(chain.stats)) {
+  pv[colnames(chain.stats)[ci]] <- wilcox.test(x = chain.stats[,ci], alternative = "two.sided", mu = 3)$p.value
+}
+
+## simple testing
+pv < 0.05
+
+## bonferroni correction for multiple comparisons
+pv < 0.05/length(pv)
+
+
+```
+
+Note: the above test confirm Gerds intuition on most of the questions and answers.
+
+Another note: I hoped for the data to be such that i can highlight some p-Hacking in there to support another argument about statistics - how one can (intended or not) shift the results of an anlysis based on his or her prejudices - , but "sadly"" the data did not follow and so even with twosided testing and Bonferroni correction the pattern of significant answers emerges. (ps: I'm not t-testing here, because the data is not normal enough)
+
+Next: group differences between chain and non-chain players!
+```{r stats2}
+
+chain.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52)
+
+###### two-sample H0 test
+pv <- c()
+for (ci in 2:ncol(chain.stats)) {
+  pv[colnames(chain.stats)[ci]] <- wilcox.test(x = chain.stats[chain.stats[,1] == 1,ci], y = chain.stats[chain.stats[,1] != 1,ci], alternative = "two.sided")$p.value
+}
+
+## simple testing
+pv < 0.05
+
+## bonferroni correction for multiple comparisons
+pv < 0.05/length(pv)
+
+
+## 103 test?
+
+```
+
+Now it's getting interesting (i report only Bonferroni corrected significance, since no hypothesis exists):
+
+* On doubles chain players and non-chain players seem to disagree (Q55)
+* The three questions about the value of chain specialities - such as hit-rate, reach and pin (Q91, Q92, Q95) - are seen differently by chains than by non-chains.
+
+## relations
+
+Years of experience against ratings and ratings against ratings:
+
+```{r years}
+
+chain.stats <- Testergebnis.Fragebogen %>% select(-P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick,-P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X51,-X52)
+
+chain.stats.cor <- chain.stats %>% psych::corr.test(use = "pairwise", method = "pearson", adjust = "holm")
+
+chain.stats.cor$r[-1,"Person.1"]
+chain.stats.cor$p[-1,"Person.1"]
+chain.stats.cor$p[-1,"Person.1"] < 0.05 # note: multiple comparison correction is already applied here
+
+chain.stats.cor$r[upper.tri(chain.stats.cor$r, diag = TRUE)] <- NA
+chain.stats.cor <- chain.stats.cor %$% inner_join(melt(r), melt(p), by = c("Var1" = "Var1", "Var2" = "Var2")) %>% rename(r = value.x, p = value.y) %>% filter(!is.na(r))
+
+ggplot(chain.stats.cor, aes(Var1, Var2, fill = r)) + geom_tile(colour = "white") + 
+  geom_text(aes(Var1, Var2, label = ifelse(p < 0.05, "*", "")), color = "red", size = 4) +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1), axis.title.x = element_blank(),
+        axis.title.y = element_blank(), panel.grid.major = element_blank(), panel.border = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
+  scale_fill_gradient(low = "black", high = "white", name = "Pearson\nCorrelation")
+# red dots mark significant correlations
+
+```
+
+Note on years: interesting relations of experience 
+
+* more experience, less important was the missing of tactical interactions with chains (Q30)
+* more experience, less was the game influenced by the rule change (Q43)
+* more experience, less faster/wilder/stressful (Q98)
