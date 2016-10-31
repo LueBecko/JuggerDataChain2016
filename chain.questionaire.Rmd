@@ -21,7 +21,7 @@ summary(Testergebnis.Fragebogen)
 
 ## Cleaning
 
-```{r clean}
+```{r clean, results='hide', warning=FALSE,collapse=TRUE}
 library(magrittr)
 library(dplyr)
 
@@ -42,19 +42,20 @@ Testergebnis.Fragebogen %<>% mutate(P2.Stab = as.factor(P2.Stab), P2.LP = as.fac
 
 ```
 
-Note: There are a lot of questions that are asked wrong - the meaning of some of the answers is in many cases not clear. This is due to relative statements with no given baseline in the questions. Given the context and that the hypothesis to each statement is known (or guessable) beforehand makes it still possible - but quit dirty - to analyse all questions, however i reckon of giving these results to much credibility.
+Note: There are a lot of questions that are asked wrong - the meaning of some of the answers is in many cases not clear. This is due to relative statements with no given baseline in the questions. Given the context and that the hypothesis to each statement is known (or guessable) beforehand makes it still possible - but quit dirty - to analyse all questions. However i issue a warning to not give these results to much credibility.
 
 ## Basic Visualisation and exploration
 
-Note: Question Person.2 (which is your MAIN Pompfe) is somewhat ill posed. However important in the current contet is just the number of chain players, all others can be treated the same.
+Note: Question Person.2 (which is your MAIN Pompfe) is somewhat ill posed. However important in the current context is just the number of chain players, all others can be treated the same.
 
-```{r vis1}
+* Count of questionnaires: `r nrow(Testergebnis.Fragebogen)`
+* Count of chains: `r sum(Testergebnis.Fragebogen$P2.Kette == 1)`
+* Ratio of chains: `r mean(Testergebnis.Fragebogen$P2.Kette == 1)`
+
+```{r vis1, results='hide', warning=FALSE, message=FALSE}
 library(ggplot2)
 library(reshape2)
-
-cat(paste("Count of questionnaires: ", nrow(Testergebnis.Fragebogen)))
-cat(paste("Count of chains: ", sum(Testergebnis.Fragebogen$P2.Kette == 1)))
-cat(paste("Ratio of chains: ", mean(Testergebnis.Fragebogen$P2.Kette == 1)))
+library(knitr)
 
 # boxplot for each score
 ggplot(melt(Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52))) +
@@ -89,54 +90,57 @@ ggplot(Testergebnis.stats2) +
 
 ## First statistics
 
-```{r stats1}
+```{r stats1, collapse=TRUE, warning=FALSE, message=FALSE}
 
 chain.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52)
 
 ##### normality
-npv <- c()
+ntest <- data.frame(Question = colnames(chain.stats), W = NA, p = NA, "H0 rejected?" = NA, stringsAsFactors = FALSE)
 for (ci in 1:ncol(chain.stats)) {
-  npv[colnames(chain.stats)[ci]] <- shapiro.test(x = chain.stats[,ci])$p.value
+  st <- shapiro.test(x = chain.stats[,ci])
+  ntest[ci,2] <- st$statistic
+  ntest[ci,3] <- st$p.value
+  ntest[ci,4] <- st$p.value < 0.05
 }
 
-npv < 0.05
+kable(x = ntest, digits = 2,
+      caption = "Results of the Shapiro-test for normality. TRUE means H0 was rejected at confidence level 0.05.")
 
 ###### H0 test
-pv <- c()
+wtest <- data.frame(Question = colnames(chain.stats), V = NA, p = NA, "H0 rejected?" = NA, "H0 rejected? Boferroni" = NA, stringsAsFactors = FALSE)
 for (ci in 1:ncol(chain.stats)) {
-  pv[colnames(chain.stats)[ci]] <- wilcox.test(x = chain.stats[,ci], alternative = "two.sided", mu = 3)$p.value
+  wt <- wilcox.test(x = chain.stats[,ci], alternative = "two.sided", mu = 3)
+  wtest[ci,2] <- wt$statistic
+  wtest[ci,3] <- wt$p.value
+  wtest[ci,4] <- wt$p.value < 0.05
+  wtest[ci,5] <- wt$p.value < 0.05 / ncol(chain.stats)
 }
 
-## simple testing
-pv < 0.05
-
-## bonferroni correction for multiple comparisons
-pv < 0.05/length(pv)
-
-
+kable(x = wtest, digits = 2,
+      caption = "Results of the Wilcoxon signed rank test with continuity correction. TRUE means H0 was rejected at confidence level 0.05 - either without or with Bonferroni correction for multiple comparison.")
 ```
 
 Note: the above test confirm Gerds intuition on most of the questions and answers.
 
-Another note: I hoped for the data to be such that i can highlight some p-Hacking in there to support another argument about statistics - how one can (intended or not) shift the results of an anlysis based on his or her prejudices - , but "sadly"" the data did not follow and so even with twosided testing and Bonferroni correction the pattern of significant answers emerges. (ps: I'm not t-testing here, because the data is not normal enough)
+Another note: I hoped for the data to be such that i can highlight some possible p-Hacking in there to support another argument about statistics - how one can (intended or not) shift the results of an anlysis based on his or her prejudices. But "sadly" the data did not follow and so even with two-sided testing and quit conservative Bonferroni correction the pattern of significant answers emerges. (ps: I'm not t-testing here, because the data is not normal enough)
 
 Next: group differences between chain and non-chain players!
-```{r stats2}
+```{r stats2, collapse=TRUE, warning=FALSE, message=FALSE}
 
 chain.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick, -X103.5,-X103.6,-X103.7,-X103.8, -X93, -X51,-X52)
 
 ###### two-sample H0 test
-pv <- c()
+twtest <- data.frame(Question = colnames(chain.stats)[-1], V = NA, p = NA, "H0 rejected?" = NA, "H0 rejected? Boferroni" = NA, stringsAsFactors = FALSE)
 for (ci in 2:ncol(chain.stats)) {
-  pv[colnames(chain.stats)[ci]] <- wilcox.test(x = chain.stats[chain.stats[,1] == 1,ci], y = chain.stats[chain.stats[,1] != 1,ci], alternative = "two.sided")$p.value
+  twt <- wilcox.test(x = chain.stats[chain.stats[,1] == 1,ci], y = chain.stats[chain.stats[,1] != 1,ci], alternative = "two.sided")
+  twtest[ci-1,2] <- twt$statistic
+  twtest[ci-1,3] <- twt$p.value
+  twtest[ci-1,4] <- twt$p.value < 0.05
+  twtest[ci-1,5] <- twt$p.value < 0.05 / ncol(chain.stats)
 }
 
-## simple testing
-pv < 0.05
-
-## bonferroni correction for multiple comparisons
-pv < 0.05/length(pv)
-
+kable(x = twtest, digits = 2,
+      caption = "Results of the two-sample Wilcoxon signed rank test with continuity correction - differences in ratings between chain players and non-chain players. TRUE means H0 was rejected at confidence level 0.05 - either without or with Bonferroni correction for multiple comparison.")
 
 ## 103 test?
 
@@ -147,7 +151,7 @@ Now it's getting interesting (i report only Bonferroni corrected significance, s
 * On doubles chain players and non-chain players seem to disagree (Q55)
 * The three questions about the value of chain specialities - such as hit-rate, reach and pin (Q91, Q92, Q95) - are seen differently by chains than by non-chains.
 
-## relations
+## Relations
 
 Years of experience against ratings and ratings against ratings:
 
@@ -156,10 +160,25 @@ Years of experience against ratings and ratings against ratings:
 chain.stats <- Testergebnis.Fragebogen %>% select(-P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick,-P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X51,-X52)
 
 chain.stats.cor <- chain.stats %>% psych::corr.test(use = "pairwise", method = "pearson", adjust = "holm")
+# note: holm multiple comparison correction is already applied here
 
-chain.stats.cor$r[-1,"Person.1"]
-chain.stats.cor$p[-1,"Person.1"]
-chain.stats.cor$p[-1,"Person.1"] < 0.05 # note: multiple comparison correction is already applied here
+kable(x = data.frame(Question = colnames(chain.stats.cor$r)[-1],
+                     ChainR = chain.stats.cor$r[-1,"Person.1"],
+                     ChainP = chain.stats.cor$p[-1,"Person.1"],
+                     ChainPs = chain.stats.cor$p[-1,"Person.1"] < 0.05),
+      digits = 2, caption = "Correlation results of years of experience (Person.1) with all other ratings")
+
+```
+
+Note on years: interesting relations of experience 
+
+* more experience, less important was the missing of tactical interactions with chains (Q30)
+* more experience, less was the game perceived influence of the rule change (Q43)
+* more experience, less faster/wilder/stressful (Q98)
+
+```{r corrs.vis1}
+library(reshape2)
+library(ggplot2)
 
 chain.stats.cor$r[upper.tri(chain.stats.cor$r, diag = TRUE)] <- NA
 chain.stats.cor <- chain.stats.cor %$% inner_join(melt(r), melt(p), by = c("Var1" = "Var1", "Var2" = "Var2")) %>% rename(r = value.x, p = value.y) %>% filter(!is.na(r))
@@ -170,11 +189,52 @@ ggplot(chain.stats.cor, aes(Var1, Var2, fill = r)) + geom_tile(colour = "white")
         axis.title.y = element_blank(), panel.grid.major = element_blank(), panel.border = element_blank(), panel.background = element_blank(), axis.ticks = element_blank()) +
   scale_fill_gradient(low = "black", high = "white", name = "Pearson\nCorrelation")
 # red dots mark significant correlations
-
 ```
 
-Note on years: interesting relations of experience 
+It is a bit confusing - many variables (34 variables resulting in 561 unique correlations) and many significant correlations (147!). Lets try something else more visually convenient: Let's treat the correlation matrix as a adjacency matrix (thresholded by p < 0.05)
 
-* more experience, less important was the missing of tactical interactions with chains (Q30)
-* more experience, less was the game influenced by the rule change (Q43)
-* more experience, less faster/wilder/stressful (Q98)
+Also note: The high number of significant correlations is a hint that the items are not meassuring independent components, but rather rely on a few latent dimensions. Lets test this first!
+
+```{r prcomp}
+chain.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick,-P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X51,-X52)
+
+factors <- prcomp(formula = ~ ., data = chain.stats, center = TRUE, scale = TRUE, retx = TRUE, na.action = na.omit)
+
+kable(x = data.frame(PC = colnames(factors$rotation), Standard.deviations = round(factors$sdev,2)), digits = 2,
+      caption = "Standard deviations of all primary components of the questionnaire data set.")
+
+kable(x = as.data.frame(factors$rotation), digits = 2,
+      caption = "Rotations matrix of the primary factor analysis. Shows decomposition of the factors into the set of asked questions.")
+```
+
+Only eight components are within this one data set and the last one is effectively zero, which reduces the number of componentes to 7. This is a good reminder to keep your questionnaires small. No matter how much you ask, your most likely just meassuring a few dimensions. Lets continue with searching for structure in this correlation matrix - maybe return to the primary factors rotation matrix later.
+
+```{r corrs.vis2}
+library(visNetwork)
+
+chain.stats.cor.nw <- chain.stats.cor %>% filter(Var1 != "Person.1", Var2 != "Person.1", p < 0.05)
+
+cv <- chain.stats.cor.nw %$% visNetwork(nodes = data.frame(id = unique(chain.stats.cor$Var1),
+                                                           label = unique(chain.stats.cor$Var1),
+                                                           title = paste("<b>Question", unique(chain.stats.cor$Var1), "</b></br>",
+                                                                         "Fill in question texts later")),
+                 edges = data.frame(to = Var1, from = Var2,
+                                    title = paste("<b>",Var1,"~",Var2,"</b></br>", "r =",  r),
+                                    value = abs(r))) %>%
+  visOptions(highlightNearest = TRUE, nodesIdSelection = TRUE)
+
+cv
+```
+
+Still a lot to digest within one picture - a dense strongly interconnected graph. But look: It's interactive!!! This neat feature allows you to explore the structure by hand. Just hover, click, drag and drop.
+
+However i still have the feeling that this visualisation doesn't tell me everything. So lets drill in with some graph methods.
+
+```{r corrs.cliques, warning=FALSE, message=FALSE}
+library(igraph) # just for the convenient implementation of largest.clique
+cvig <- chain.stats.cor.nw %$% graph.data.frame(data.frame(to = Var1, from = Var2), directed = FALSE)
+largest.cliques(cvig)
+```
+
+
+
