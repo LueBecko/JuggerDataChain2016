@@ -203,11 +203,33 @@ factors <- prcomp(formula = ~ ., data = chain.stats, center = TRUE, scale = TRUE
 kable(x = data.frame(PC = colnames(factors$rotation), Standard.deviations = round(factors$sdev,2)), digits = 2,
       caption = "Standard deviations of all primary components of the questionnaire data set.")
 
-kable(x = as.data.frame(factors$rotation), digits = 2,
-      caption = "Rotations matrix of the primary factor analysis. Shows decomposition of the factors into the set of asked questions.")
+#kable(x = as.data.frame(factors$rotation), digits = 2,
+#      caption = "Rotations matrix of the primary factor analysis. Shows decomposition of the factors into the set of asked questions.")
 ```
 
-Only eight components are within this one data set and the last one is effectively zero, which reduces the number of componentes to 7. This is a good reminder to keep your questionnaires small. No matter how much you ask, your most likely just meassuring a few dimensions. Lets continue with searching for structure in this correlation matrix - maybe return to the primary factors rotation matrix later.
+Only eight components are within this one data set and the last one is effectively zero, which reduces the number of componentes to 7. At first this seems like an interesting result, but hold on! How many rows of the result table are without any missing values? Exactly 8! Well that explains a lot ... But lets have a look at the questions without answers: It turns out that question 20 askes only chain players (and thus 34 missing values), 30 asks only Pompfers (8 mising values - discrepancies with the number sof the question Person2 are due to the fact that Person2 asks only for the main Pompfe, while Q20 and Q30 apply also for secondary and tertiary Pompfe), 53 and 54 are only applicable if a chain-double occured to that player (14 and 11 missing values). This is good news, since subjects read and followed the instructions :) So next take on primary components:
+
+```{r prcomp2}
+library(ggplot2)
+ggplot(data = data.frame(Question = colnames(chain.stats), N.missing.values = colSums(is.na(chain.stats))), aes(x = Question, y = N.missing.values)) + geom_bar(stat = "identity")
+
+chain.stats <- Testergebnis.Fragebogen %>% select(-Person.1, -P2.Q,-P2.Stab,-P2.LP,-P2.Schild,-P2.Quick,-P2.Kette, -X103.5,-X103.6,-X103.7,-X103.8, -X51,-X52, -X20, -X30, -X53, -X54)
+
+factors <- prcomp(formula = ~ ., data = chain.stats, center = TRUE, scale = TRUE, retx = TRUE, na.action = na.omit)
+
+kable(x = data.frame(PC = colnames(factors$rotation), Standard.deviations = round(factors$sdev,2)), digits = 2,
+      caption = "Standard deviations of all primary components of the questionnaire data set.")
+
+ggplot(data = data.frame(pos = 1:length(colnames(factors$rotation)),PC = colnames(factors$rotation), fraction = 1 - cumsum(factors$sdev)/sum(factors$sdev)), aes(x = pos, y = fraction)) + geom_area() #+ geom_bar(stat = "identity")
+
+kable(x = as.data.frame(factors$rotation), digits = 2,
+      caption = "Rotations matrix of the primary factor analysis. Shows decomposition of the factors into the set of asked questions.")
+
+```
+
+The resulting 29 questions produce a typical decrease in primary component power. It shows that i can drop 15 factors (of 29) and still only loos less than 20% of the variance within the data. This serves as a minor hint that there might be some hidden structure in the data, although it is weak since the steepness of the decrease is not that radical. But as a remninder keep in mind the highest values of the first component: Q55, Q95, Q92, Q56, Q91, Q96, Q102, Q63, Q61, Q97, ...
+
+So much for that. Now back to the graph analysis. As a reminder: I wanted to highlight some structures of the correelation matrix.
 
 ```{r corrs.vis2}
 library(visNetwork)
@@ -228,7 +250,7 @@ cv
 
 Still a lot to digest within one picture - a dense strongly interconnected graph. But look: It's interactive!!! This neat feature allows you to explore the structure by hand. Just hover, click, drag and drop.
 
-However i still have the feeling that this visualisation doesn't tell me everything. So lets drill in with some graph methods.
+However i still have the feeling that this visualisation doesn't tell me everything - still it gives me a very good intuition of whats going on. So lets drill in with some graph methods.
 
 ```{r corrs.cliques, warning=FALSE, message=FALSE}
 library(igraph) # just for the convenient implementation of largest.clique
