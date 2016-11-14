@@ -162,7 +162,7 @@ Now it's getting interesting (i report only Bonferroni corrected significance, s
 * The three questions about the value of chain specialities - such as hit-rate, reach and pin (Q91, Q92, Q95) - are seen differently by chains than by non-chains.
 
 
-And now onto Gerds big news: **Question 103!** What number of stones is preferred? 5,6,7 or *more than 8*? (note that *more than 8* was recoded by some subjects as *8 or above*, nevertheless the answer options were erronouse and we can't dismiss any effect of this on the results with absoulte certainty - even though it seems plausible)
+And now onto Gerds big news: **Question 103!** What number of stones is preferred? 5,6,7 or *more than 8*? (note that *more than 8* was recorded by some subjects as *8 or above*, nevertheless the answer options were erronouse and we can't dismiss any effect of this on the results with absoulte certainty - even though it seems plausible)
 ```{r Q103}
 library(reshape2)
 X103.stats <- Testergebnis.Fragebogen %>% select(X103.5,X103.6,X103.7,X103.8) %>% summarise_all(funs(sum))
@@ -175,6 +175,7 @@ ggplot(melt(X103.stats)) +
 
 # only consider answers for 5 and 8 (6 and 7 are noise to me, since no hypothesis nor test for those was present)
 binom.test(x = c(X103.stats$X103.5[1], X103.stats$X103.8[1]), p = 0.5, alternative = "greater")
+binom.test(x = X103.stats$X103.5[1], n = nrow(Testergebnis.Fragebogen), p = 0.5, alternative = "greater")
 ```
 
 As we can see, there is no significant trend towards one side or the other. Given that we have a very likely recruiters bias (among other methodlogical problems) i might add that the 8-to-5 ratio might be totally diffferent in the general population, as to 8 being the significant more prominent answer - this of course is speculative, but on the other side many of Gerds conclusions are speculative too.
